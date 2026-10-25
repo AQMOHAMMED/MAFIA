@@ -108,12 +108,15 @@ label{font-size:14px;color:var(--muted);font-weight:600}
   text-shadow:0 1px 3px #000}
 
 /* جماعة المافيا تحت الكرت (بتطلع للمافيا بس) */
-#card.has-mates{--reserve:150px}
 #cMates{display:none;flex:0 0 auto;width:min(100%,520px);padding:8px 12px;text-align:center;font-size:15px;font-weight:700;line-height:1.6;color:#fff;
   background:rgba(40,4,10,.85);border:1.5px solid #ff3b55;box-shadow:0 0 14px rgba(255,59,85,.35);border-radius:10px}
 #card.has-mates #cMates{display:block}
-#cMates b{color:#f3c75a}
-#cMates .out{opacity:.5;text-decoration:line-through}
+#cMates .hd{display:block;color:#f3c75a;font-size:14px;margin-bottom:6px}
+#cMates .list{display:flex;flex-wrap:wrap;justify-content:center;gap:6px}
+#cMates .mate{display:inline-flex;align-items:center;gap:5px;white-space:nowrap;padding:3px 10px;border-radius:99px;
+  background:rgba(255,59,85,.14);border:1px solid rgba(255,59,85,.55);font-size:14px}
+#cMates .mate small{color:#f3c75a;font-size:12px;font-weight:700}
+#cMates .mate.out{opacity:.45;text-decoration:line-through}
 #surrenderBtn{flex:0 0 auto;width:min(100%,520px);padding:3px;border-radius:0;
   background:linear-gradient(135deg,#fff0b0,#e0a93a 25%,#8a5a12 50%,#f6d36f 70%,#a06c18);
   clip-path:polygon(18px 0,calc(100% - 18px) 0,100% 50%,calc(100% - 18px) 100%,18px 100%,0 50%);
@@ -490,10 +493,14 @@ function renderCard(){
 function renderMates(){
   const mates = S.me.mates;
   $("card").classList.toggle("has-mates", !!mates);
+  $("card").style.removeProperty("--reserve");
   if (!mates) return;
   $("cMates").innerHTML = mates.length
-    ? "<b>🤝 جماعتك:</b> " + mates.map(m => `<span class="${m.out ? "out" : ""}">${esc(m.name)} (${esc(ROLES[m.role].name)})</span>`).join(" · ")
-    : "<b>🕶️ إنت المافيا الوحيد</b> بهاي الجولة";
+    ? `<span class="hd">🤝 جماعتك بالمافيا</span><div class="list">` + mates.map(m =>
+        `<span class="mate${m.out ? " out" : ""}">${ROLES[m.role].icon} ${esc(m.name)} <small>${esc(ROLES[m.role].name)}</small></span>`).join("") + "</div>"
+    : `<span class="hd" style="margin:0">🕶️ إنت المافيا الوحيد بهاي الجولة</span>`;
+  // الكرت بيصغر على قد ما الشريط بياخد، عشان الزر يضل ظاهر بدون سكرول
+  requestAnimationFrame(() => $("card").style.setProperty("--reserve", (96 + $("cMates").offsetHeight + 12) + "px"));
 }
 
 const sBtn = $('surrenderBtn');
