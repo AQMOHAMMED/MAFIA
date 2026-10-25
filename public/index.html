@@ -319,10 +319,13 @@ const store = {
   del(k){ try { localStorage.removeItem('mafia_'+k); } catch {} },
 };
 
+let currentScreen = null;
 function show(id){
   document.querySelectorAll('.screen').forEach(s => s.classList.toggle('on', s.id === id));
   $('card').classList.toggle('on', id === 'card');
-  window.scrollTo(0,0);
+  // نرجع لفوق بس لما تتغير الشاشة، مش مع كل تحديث من السيرفر
+  if (id !== currentScreen) window.scrollTo(0,0);
+  currentScreen = id;
 }
 function toast(msg){
   const t = $('toast'); t.textContent = msg; t.style.display = 'block';
