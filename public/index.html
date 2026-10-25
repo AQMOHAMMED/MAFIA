@@ -84,6 +84,24 @@ label{font-size:14px;color:var(--muted);font-weight:600}
   width:min(100%,520px,calc((100dvh - 96px - env(safe-area-inset-top) - env(safe-area-inset-bottom)) * 848 / 1264));
   filter:drop-shadow(0 10px 30px rgba(0,0,0,.7))}
 .cardimg img{display:block;width:100%;height:100%;user-select:none;-webkit-user-drag:none}
+/* كرت مؤقت للأدوار اللي لسا ما إلها صورة، بنفس ستايل الكروت */
+#cFallback{display:none;position:absolute;inset:0;padding:5cqw 5cqw 4cqw;flex-direction:column;align-items:center;gap:2cqw;
+  border:1cqw solid #d9a640;outline:.5cqw solid #ff3b55;outline-offset:-2.4cqw;
+  clip-path:polygon(5cqw 0,calc(100% - 5cqw) 0,100% 5cqw,100% calc(100% - 5cqw),calc(100% - 5cqw) 100%,5cqw 100%,0 calc(100% - 5cqw),0 5cqw);
+  background:radial-gradient(80% 45% at 50% 22%,#5a0b16 0%,#1a0408 60%,#0a0204 100%)}
+.cardimg.nofile img{display:none}
+.cardimg.nofile #cFallback{display:flex}
+#cFallback .fb-team{align-self:flex-start;font-weight:800;font-size:3.6cqw;color:#fff;padding:1.2cqw 3.5cqw;border:.4cqw solid #d9a640;background:#160307}
+#cFallback .fb-icon{width:27cqw;aspect-ratio:1;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:14cqw;
+  border:.7cqw solid #ff3b55;box-shadow:0 0 6cqw #ff3b55,inset 0 0 6cqw rgba(255,59,85,.45)}
+#cFallback .fb-title{width:100%;text-align:center;font-family:Lalezar,Cairo,sans-serif;font-size:10.5cqw;line-height:1.3;
+  border:.9cqw solid #d9a640;background:#120306;color:#f3c75a;text-shadow:0 .5cqw 0 #4a2c05}
+#cFallback .fb-name{min-width:38%;padding:.8cqw 3cqw;border:.5cqw solid #d9a640;background:#120306;margin-top:-1cqw;text-align:center;color:#fff;font-weight:800;font-size:4.2cqw}
+.cardimg.nofile #cPlayer{display:none}
+#cFallback .fb-sec{width:100%;border:.4cqw solid #ff3b55;background:rgba(0,0,0,.45);padding:1.4cqw 3cqw;text-align:right}
+#cFallback .fb-sec b{display:block;color:#f3c75a;font-size:3.4cqw}
+#cFallback .fb-sec p{color:#fff;font-size:3.3cqw;line-height:1.5;font-weight:600}
+#cFallback .fb-slogan{margin-top:auto;font-family:Lalezar,Cairo,sans-serif;font-size:5cqw;color:#e9b84a}
 /* اسم اللاعب جوا الخانة الفاضية بالكرت */
 #cPlayer{position:absolute;left:50%;top:var(--ny,60%);transform:translate(-50%,-50%);width:34%;
   text-align:center;font-weight:800;font-size:4.4cqw;line-height:1.2;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
@@ -200,7 +218,7 @@ label{font-size:14px;color:var(--muted);font-weight:600}
 
 <!-- الكرت -->
 <div id="card">
-  <div class="cardimg"><img id="cImg" alt=""><div id="cPlayer"></div></div>
+  <div class="cardimg"><img id="cImg" alt=""><div id="cFallback"></div><div id="cPlayer"></div></div>
   <button id="surrenderBtn"><div class="in" id="sLabel">سلّم كرتك</div></button>
 </div>
 
@@ -244,6 +262,12 @@ const ROLES = {
     power: 'سكّت اللي شاكّين فيكم أو اللي حكيه خطير على المافيا.',
     goal: 'تفوزوا لما يصير عدد المافيا قد عدد الصالحين.'
   },
+  mafia: {
+    name: 'مافيا', icon: '🕶️', team: 'mafia',
+    desc: 'إنت من المافيا. وقت التغميض بتصحى مع جماعتك وبتتفقوا بالإشارة على اللاعب اللي بدكم تطلّعوه، وشيخ المافيا بأشّر عليه للهوست.',
+    power: 'بالنهار مثّل إنك مواطن صالح، ودافع عن جماعتك بدون ما تكشفهم.',
+    goal: 'تفوزوا لما يصير عدد المافيا قد عدد الصالحين.'
+  },
   townSheikh: {
     name: 'شيخ الصالحين', icon: '👳', team: 'town',
     desc: 'وقت التغميض بتأشّر على أي لاعب، والهوست بجاوبك بإصبعه: 👍 يعني صالح، 👎 يعني مافيا.',
@@ -275,7 +299,7 @@ const ROLES = {
     goal: 'تكشفوا كل المافيا وتطلّعوهم.'
   },
 };
-const SPECIAL = ['mafiaSheikh','mafiaGirl','mafiaBoy','townSheikh','doctor','sniper','townBoy'];
+const SPECIAL = ['mafiaSheikh','mafiaGirl','mafiaBoy','mafia','townSheikh','doctor','sniper','townBoy'];
 const TEAM_NAME = { mafia: 'مافيا', town: 'مواطن صالح' };
 const TEAM_ICON = { mafia: '🔴', town: '🟢' };
 
@@ -309,7 +333,7 @@ function inviteLink(){ return `${location.origin}${location.pathname}?room=${S.c
 
 function defaultRoles(n){
   const m = Math.max(1, Math.floor(n / 4));
-  return { mafiaSheikh: 1, mafiaGirl: m >= 2 ? 1 : 0, mafiaBoy: m >= 3 ? m - 2 : 0,
+  return { mafiaSheikh: 1, mafiaGirl: m >= 2 ? 1 : 0, mafiaBoy: m >= 3 ? 1 : 0, mafia: Math.max(0, m - 3),
            townSheikh: 1, doctor: n >= 4 ? 1 : 0, sniper: n >= 7 ? 1 : 0, townBoy: n >= 8 ? 1 : 0 };
 }
 
@@ -429,12 +453,24 @@ const NAME_Y = {
 // نحمّل صور الكروت مسبقاً عشان تطلع فوراً لما تبلش اللعبة
 Object.keys(NAME_Y).forEach(r => { new Image().src = `img/cards/${r}.webp`; });
 
+function fallbackCard(r, name){
+  const sec = (h, t) => `<div class="fb-sec"><b>${h}</b><p>${esc(t)}</p></div>`;
+  return `<div class="fb-team">● فريق المافيا</div><div class="fb-icon">${r.icon}</div>
+    <div class="fb-title">${esc(r.name)}</div><div class="fb-name">${esc(name)}</div>
+    ${sec("🎯 شو دورك؟", r.desc)}${sec("💡 نصيحة", r.power)}${sec("🏆 متى بتفوز؟", r.goal)}
+    <div class="fb-slogan">في الظلّ… نحكُم</div>`;
+}
+function esc(t){ const d = document.createElement("div"); d.textContent = t; return d.innerHTML; }
+
 function renderCard(){
   const role = S.me.role, r = ROLES[role];
+  const hasFile = role in NAME_Y;
+  document.querySelector(".cardimg").classList.toggle("nofile", !hasFile);
+  $("cFallback").innerHTML = hasFile ? "" : fallbackCard(r, S.players.find(p => p.id === myId)?.name || "");
   $('card').className = 'on ' + r.team;
-  $('cImg').src = `img/cards/${role}.webp`;
+  if (hasFile) $('cImg').src = `img/cards/${role}.webp`;
   $('cImg').alt = r.name;
-  $('cPlayer').style.setProperty('--ny', NAME_Y[role]);
+  $('cPlayer').style.setProperty('--ny', NAME_Y[role] || '39.6%');
   $('cPlayer').textContent = S.players.find(p => p.id === myId)?.name || '';
   resetSurrender();
 }

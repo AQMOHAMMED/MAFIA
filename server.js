@@ -15,6 +15,7 @@ const ROLES = {
   mafiaSheikh: { team: 'mafia' },
   mafiaGirl: { team: 'mafia' },
   mafiaBoy: { team: 'mafia' },
+  mafia: { team: 'mafia' },
   townSheikh: { team: 'town' },
   doctor: { team: 'town' },
   sniper: { team: 'town' },
