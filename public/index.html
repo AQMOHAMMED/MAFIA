@@ -81,7 +81,7 @@ label{font-size:14px;color:var(--muted);font-weight:600}
 #card.mafia{background:radial-gradient(90% 60% at 50% 30%,#3d0710 0%,#160307 60%,#060102 100%)}
 /* الكرت صورة كاملة بنسبة 848×1264، وبتكبر لأكبر حجم بيوسع بالشاشة مع الزر */
 .cardimg{position:relative;container-type:inline-size;aspect-ratio:848/1264;
-  width:min(100%,520px,calc((100dvh - 96px - env(safe-area-inset-top) - env(safe-area-inset-bottom)) * 848 / 1264));
+  width:min(100%,520px,calc((100dvh - var(--reserve,96px) - env(safe-area-inset-top) - env(safe-area-inset-bottom)) * 848 / 1264));
   filter:drop-shadow(0 10px 30px rgba(0,0,0,.7))}
 .cardimg img{display:block;width:100%;height:100%;user-select:none;-webkit-user-drag:none}
 /* كرت مؤقت للأدوار اللي لسا ما إلها صورة، بنفس ستايل الكروت */
@@ -107,6 +107,13 @@ label{font-size:14px;color:var(--muted);font-weight:600}
   text-align:center;font-weight:800;font-size:4.4cqw;line-height:1.2;color:#fff;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;
   text-shadow:0 1px 3px #000}
 
+/* جماعة المافيا تحت الكرت (بتطلع للمافيا بس) */
+#card.has-mates{--reserve:150px}
+#cMates{display:none;flex:0 0 auto;width:min(100%,520px);padding:8px 12px;text-align:center;font-size:15px;font-weight:700;line-height:1.6;color:#fff;
+  background:rgba(40,4,10,.85);border:1.5px solid #ff3b55;box-shadow:0 0 14px rgba(255,59,85,.35);border-radius:10px}
+#card.has-mates #cMates{display:block}
+#cMates b{color:#f3c75a}
+#cMates .out{opacity:.5;text-decoration:line-through}
 #surrenderBtn{flex:0 0 auto;width:min(100%,520px);padding:3px;border-radius:0;
   background:linear-gradient(135deg,#fff0b0,#e0a93a 25%,#8a5a12 50%,#f6d36f 70%,#a06c18);
   clip-path:polygon(18px 0,calc(100% - 18px) 0,100% 50%,calc(100% - 18px) 100%,18px 100%,0 50%);
@@ -219,6 +226,7 @@ label{font-size:14px;color:var(--muted);font-weight:600}
 <!-- الكرت -->
 <div id="card">
   <div class="cardimg"><img id="cImg" alt=""><div id="cFallback"></div><div id="cPlayer"></div></div>
+  <div id="cMates"></div>
   <button id="surrenderBtn"><div class="in" id="sLabel">سلّم كرتك</div></button>
 </div>
 
@@ -475,7 +483,17 @@ function renderCard(){
   $('cImg').alt = r.name;
   $('cPlayer').style.setProperty('--ny', NAME_Y[role] || '39.6%');
   $('cPlayer').textContent = S.players.find(p => p.id === myId)?.name || '';
+  renderMates();
   resetSurrender();
+}
+
+function renderMates(){
+  const mates = S.me.mates;
+  $("card").classList.toggle("has-mates", !!mates);
+  if (!mates) return;
+  $("cMates").innerHTML = mates.length
+    ? "<b>🤝 جماعتك:</b> " + mates.map(m => `<span class="${m.out ? "out" : ""}">${esc(m.name)} (${esc(ROLES[m.role].name)})</span>`).join(" · ")
+    : "<b>🕶️ إنت المافيا الوحيد</b> بهاي الجولة";
 }
 
 const sBtn = $('surrenderBtn');

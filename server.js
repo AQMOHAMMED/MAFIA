@@ -71,9 +71,15 @@ function broadcast(room) {
   for (const p of room.players) {
     if (!p.socketId) continue;
     const seeAll = (p.id === room.hostId && room.phase !== 'lobby') || room.phase === 'ended';
+    // المافيا بس بيعرفوا جماعتهم، وما بتنبعت لحدا غيرهم
+    const isMafia = p.role && ROLES[p.role].team === 'mafia';
+    const mates = isMafia
+      ? room.players.filter(x => x.id !== p.id && x.role && ROLES[x.role].team === 'mafia')
+          .map(x => ({ name: x.name, role: x.role, out: x.surrendered }))
+      : null;
     io.to(p.socketId).emit('state', {
       ...state,
-      me: { id: p.id, role: p.role, surrendered: p.surrendered },
+      me: { id: p.id, role: p.role, surrendered: p.surrendered, mates },
       // الراوي يشوف كل الأدوار، والكل يشوفها بنهاية الجولة
       allRoles: seeAll ? Object.fromEntries(room.players.map(x => [x.id, x.role])) : null,
     });
