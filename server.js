@@ -41,7 +41,17 @@ function shuffle(arr) {
 }
 
 function playingPlayers(room) {
+  // أثناء اللعب: اللي معهم كروت. بالغرفة: الكل ما عدا الهوست الثابت
+  if (room.phase !== 'lobby') return room.players.filter(p => p.role);
   return room.players.filter(p => !(room.hostMode === 'fixed' && p.id === room.leaderId));
+}
+
+// إذا الليدر طلع أو انقطع، بننقل القيادة لأول لاعب متصل
+function passLeader(room) {
+  const next = room.players.find(p => p.online && p.id !== room.leaderId);
+  if (!next) return false;
+  room.leaderId = next.id;
+  return true;
 }
 
 function publicState(room) {
@@ -100,8 +110,35 @@ io.on('connection', socket => {
   let player = null;
 
   const fail = msg => socket.emit('fail', msg);
+  // كل رسالة من اللاعب بتمر من هون: أي خطأ بينطبع بس، وما بيوقّع السيرفر على الكل
+  const on = (ev, fn) => socket.on(ev, (...args) => {
+    try { fn(...args); } catch (e) { console.error('خطأ بـ', ev, e); }
+  });
+  const obj = d => (d && typeof d === 'object' ? d : {});
+  // هالاتصال هو الاتصال الحالي للاعب؟ (لو فتح من مكان ثاني، الاتصال القديم ما بيقدر يعمل إشي)
+  const active = () => !!(room && player && player.socketId === socket.id);
+
+  function leaveRoom() {
+    if (!room) return;
+    const r = room, p = player;
+    room = player = null;
+    socket.leave(r.code);
+    if (p.socketId !== socket.id) return;
+    p.online = false;
+    p.socketId = null;
+    if (r.phase === 'lobby') r.players = r.players.filter(x => x !== p);
+    if (r.leaderId === p.id && !passLeader(r) && r.players[0]) r.leaderId = r.players[0].id;
+    if (!r.players.some(x => x.online)) rooms.delete(r.code);
+    else broadcast(r);
+  }
 
   function attach(r, p) {
+    if (room && (room !== r || player !== p)) leaveRoom();
+    // إذا اللاعب كان فاتح من جهاز أو متصفح ثاني، بنفصل الاتصال القديم
+    if (p.socketId && p.socketId !== socket.id) {
+      const old = io.sockets.sockets.get(p.socketId);
+      if (old) { old.leave(r.code); old.emit('replaced'); }
+    }
     room = r;
     player = p;
     p.socketId = socket.id;
@@ -111,7 +148,8 @@ io.on('connection', socket => {
     broadcast(r);
   }
 
-  socket.on('create', ({ name, size, roles, hostMode }) => {
+  on('create', d => {
+    let { name, size, roles, hostMode } = obj(d);
     name = String(name || '').trim().slice(0, 20);
     size = Math.max(3, Math.min(30, parseInt(size) || 0));
     if (!name) return fail('اكتب اسمك');
@@ -125,41 +163,49 @@ io.on('connection', socket => {
     attach(r, p);
   });
 
-  socket.on('join', ({ code, name, playerId }) => {
+  on('join', d => {
+    let { code, name, playerId } = obj(d);
     const r = rooms.get(String(code || '').trim());
-    if (!r) return fail('ما في غرفة بهالكود');
-    // رجوع لاعب انقطع اتصاله
+    // رجوع لجلسة قديمة والغرفة ما عادت موجودة (مثلاً السيرفر عمل ريستارت)
+    if (!r) return playerId ? socket.emit('expired') : fail('ما في غرفة بهالكود');
     const existing = playerId && r.players.find(p => p.id === playerId);
     if (existing) return attach(r, existing);
     name = String(name || '').trim().slice(0, 20);
-    if (!name) return fail('اكتب اسمك');
+    if (!name) return playerId ? socket.emit('expired') : fail('اكتب اسمك');
+    // نفس الاسم ومش متصل: نفس اللاعب رجع من متصفح ثاني (مثلاً واتساب ← كروم)
+    const byName = r.players.find(p => p.name === name);
+    if (byName) return byName.online ? fail('الاسم مستخدم، اختار اسم ثاني') : attach(r, byName);
     if (r.phase !== 'lobby') return fail('اللعبة بلّشت، استنى الجولة الجاية');
     const capacity = r.size + (r.hostMode === 'fixed' ? 1 : 0);
     if (r.players.length >= capacity) return fail('الغرفة مليانة');
-    if (r.players.some(p => p.name === name)) return fail('الاسم مستخدم، اختار اسم ثاني');
     const p = { id: crypto.randomUUID(), name, online: true, surrendered: false, role: null };
     r.players.push(p);
     attach(r, p);
   });
 
-  socket.on('settings', ({ size, roles, hostMode }) => {
-    if (!room || player.id !== room.leaderId || room.phase !== 'lobby') return;
+  on('settings', d => {
+    const { size, roles, hostMode } = obj(d);
+    if (!active() || player.id !== room.leaderId || room.phase !== 'lobby') return;
     room.size = Math.max(3, Math.min(30, parseInt(size) || room.size));
     room.roles = sanitizeRoles(roles);
     room.hostMode = sanitizeHostMode(hostMode);
     broadcast(room);
   });
 
-  socket.on('kick', id => {
-    if (!room || player.id !== room.leaderId || room.phase !== 'lobby' || id === player.id) return;
+  on('kick', id => {
+    if (!active() || player.id !== room.leaderId || room.phase !== 'lobby' || id === player.id) return;
     const k = room.players.find(p => p.id === id);
-    room.players = room.players.filter(p => p.id !== id);
-    if (k && k.socketId) io.to(k.socketId).emit('kicked');
+    if (!k) return;
+    room.players = room.players.filter(p => p !== k);
+    const ks = k.socketId && io.sockets.sockets.get(k.socketId);
+    if (ks) { ks.leave(room.code); ks.emit('kicked'); }
+    k.socketId = null;
+    k.online = false;
     broadcast(room);
   });
 
-  socket.on('start', () => {
-    if (!room || player.id !== room.leaderId || room.phase !== 'lobby') return;
+  on('start', () => {
+    if (!active() || player.id !== room.leaderId || room.phase !== 'lobby') return;
     const players = playingPlayers(room);
     if (players.length !== room.size) return fail(`لازم يكون عدد اللاعبين ${room.size}`);
     const special = Object.entries(room.roles).flatMap(([k, n]) => Array(n).fill(k));
@@ -178,8 +224,8 @@ io.on('connection', socket => {
     broadcast(room);
   });
 
-  socket.on('surrender', () => {
-    if (!room || room.phase !== 'playing' || !player.role || player.surrendered) return;
+  on('surrender', () => {
+    if (!active() || room.phase !== 'playing' || !player.role || player.surrendered) return;
     player.surrendered = true;
     const team = ROLES[player.role].team;
     const becameHost = !room.hostId;
@@ -191,8 +237,8 @@ io.on('connection', socket => {
     broadcast(room);
   });
 
-  socket.on('reset', () => {
-    if (!room || player.id !== room.leaderId) return;
+  on('reset', () => {
+    if (!active() || player.id !== room.leaderId) return;
     room.phase = 'lobby';
     room.winner = null;
     room.hostId = null;
@@ -201,31 +247,21 @@ io.on('connection', socket => {
     broadcast(room);
   });
 
-  socket.on('leave', () => {
-    if (!room) return;
-    const r = room;
-    if (r.phase === 'lobby') {
-      r.players = r.players.filter(p => p.id !== player.id);
-      if (r.leaderId === player.id && r.players[0]) r.leaderId = r.players[0].id;
-    } else {
-      player.online = false;
-      player.socketId = null;
-    }
-    socket.leave(r.code);
-    room = player = null;
-    if (!r.players.some(p => p.online)) rooms.delete(r.code);
-    else broadcast(r);
-  });
+  on('leave', leaveRoom);
 
-  socket.on('disconnect', () => {
-    if (!room) return;
-    player.online = false;
-    player.socketId = null;
-    const r = room;
+  on('disconnect', () => {
+    if (!active()) return;
+    const r = room, p = player;
+    p.online = false;
+    p.socketId = null;
     broadcast(r);
+    // إذا الليدر ما رجع خلال 30 ثانية، بتنتقل القيادة لحدا متصل عشان اللعبة ما توقف
+    setTimeout(() => {
+      if (rooms.get(r.code) === r && !p.online && r.leaderId === p.id && passLeader(r)) broadcast(r);
+    }, 30 * 1000);
     // نحذف الغرفة إذا ضلت فاضية ساعة
     setTimeout(() => {
-      if (rooms.get(r.code) === r && !r.players.some(p => p.online)) rooms.delete(r.code);
+      if (rooms.get(r.code) === r && !r.players.some(x => x.online)) rooms.delete(r.code);
     }, 60 * 60 * 1000);
   });
 });

@@ -379,11 +379,14 @@ socket.on('joined', ({ code, playerId }) => {
   store.set('session', { code, playerId });
   history.replaceState(null, '', location.pathname);
 });
-socket.on('fail', msg => {
-  // إذا فشل الرجوع لجلسة قديمة، امسحها بصمت
-  if (!S && store.get('session')) { store.del('session'); if (msg === 'ما في غرفة بهالكود') return; }
-  toast(msg);
+socket.on('fail', msg => toast(msg));
+// الغرفة ما عادت موجودة (مثلاً السيرفر عمل ريستارت): نرجع للرئيسية بدل ما نضل عالق على شاشة قديمة
+socket.on('expired', () => {
+  store.del('session');
+  if (S) { S = null; show('home'); toast('الغرفة انتهت، اعملوا غرفة جديدة'); }
 });
+// نفس اللاعب فتح اللعبة من مكان ثاني، فهالشاشة بتوقف
+socket.on('replaced', () => { S = null; show('home'); toast('فتحت اللعبة من مكان ثاني'); });
 socket.on('kicked', () => { store.del('session'); S = null; show('home'); toast('الليدر طلّعك من الغرفة'); });
 socket.on('state', st => { S = st; render(); });
 socket.on('reveal', ({ name, team, host }) => {
