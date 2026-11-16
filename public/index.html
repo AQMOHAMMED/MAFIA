@@ -81,9 +81,22 @@ label{font-size:14px;color:var(--muted);font-weight:600}
 #card.mafia{background:radial-gradient(90% 60% at 50% 30%,#3d0710 0%,#160307 60%,#060102 100%)}
 /* الكرت صورة كاملة بنسبة 848×1264، وبتكبر لأكبر حجم بيوسع بالشاشة مع الزر */
 .cardimg{position:relative;container-type:inline-size;aspect-ratio:848/1264;
-  width:min(100%,520px,calc((100dvh - var(--reserve,96px) - env(safe-area-inset-top) - env(safe-area-inset-bottom)) * 848 / 1264));
-  filter:drop-shadow(0 10px 30px rgba(0,0,0,.7))}
+  width:min(100%,520px,calc((100dvh - var(--reserve,130px) - env(safe-area-inset-top) - env(safe-area-inset-bottom)) * 848 / 1264));
+  perspective:1600px;cursor:pointer;-webkit-tap-highlight-color:transparent;transition:width .35s ease}
 .cardimg img{display:block;width:100%;height:100%;user-select:none;-webkit-user-drag:none}
+/* القلب: الكرت بيبلش على ظهره، كبسة بتقلبه على وجهه وكبسة ثانية بترجعه */
+.flipper{position:absolute;inset:0;transform-style:preserve-3d;transition:transform .7s cubic-bezier(.3,1.25,.5,1)}
+#card.flipped .flipper{transform:rotateY(180deg)}
+.face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden}
+.face img{filter:drop-shadow(0 10px 30px rgba(0,0,0,.7))}
+.face.front{transform:rotateY(180deg)}
+#card:not(.flipped) .face.back img{animation:backGlow 2.2s ease-in-out infinite}
+@keyframes backGlow{0%,100%{filter:drop-shadow(0 10px 30px rgba(0,0,0,.7)) drop-shadow(0 0 6px rgba(240,190,80,.25))}
+  50%{filter:drop-shadow(0 10px 30px rgba(0,0,0,.7)) drop-shadow(0 0 22px rgba(240,190,80,.55))}}
+#cHint{flex:0 0 auto;font-weight:800;font-size:15px;color:#f3c75a;text-align:center;line-height:22px}
+#card:not(.flipped) #cHint{animation:hintPulse 1.6s ease-in-out infinite}
+#card.flipped #cHint{color:#9a9db0;font-size:13px;font-weight:700}
+@keyframes hintPulse{50%{opacity:.55}}
 /* كرت مؤقت للأدوار اللي لسا ما إلها صورة، بنفس ستايل الكروت */
 #cFallback{display:none;position:absolute;inset:0;padding:5cqw 5cqw 4cqw;flex-direction:column;align-items:center;gap:2cqw;
   border:1cqw solid #d9a640;outline:.5cqw solid #ff3b55;outline-offset:-2.4cqw;
@@ -110,7 +123,7 @@ label{font-size:14px;color:var(--muted);font-weight:600}
 /* جماعة المافيا تحت الكرت (بتطلع للمافيا بس) */
 #cMates{display:none;flex:0 0 auto;width:min(100%,520px);padding:8px 12px;text-align:center;font-size:15px;font-weight:700;line-height:1.6;color:#fff;
   background:rgba(40,4,10,.85);border:1.5px solid #ff3b55;box-shadow:0 0 14px rgba(255,59,85,.35);border-radius:10px}
-#card.has-mates #cMates{display:block}
+#card.flipped.has-mates #cMates{display:block}
 #cMates .hd{display:block;color:#f3c75a;font-size:14px;margin-bottom:6px}
 #cMates .list{display:flex;flex-wrap:wrap;justify-content:center;gap:6px}
 #cMates .mate{display:inline-flex;align-items:center;gap:5px;white-space:nowrap;padding:3px 10px;border-radius:99px;
@@ -228,7 +241,11 @@ label{font-size:14px;color:var(--muted);font-weight:600}
 
 <!-- الكرت -->
 <div id="card">
-  <div class="cardimg"><img id="cImg" alt=""><div id="cFallback"></div><div id="cPlayer"></div></div>
+  <div class="cardimg" id="cFlip"><div class="flipper">
+    <div class="face front"><img id="cImg" alt=""><div id="cFallback"></div><div id="cPlayer"></div></div>
+    <div class="face back"><img src="img/cards/back.webp" alt="ظهر الكرت"></div>
+  </div></div>
+  <div id="cHint"></div>
   <div id="cMates"></div>
   <button id="surrenderBtn"><div class="in" id="sLabel">سلّم كرتك</div></button>
 </div>
@@ -408,7 +425,7 @@ function render(){
   if (!S) return;
   if (S.phase === 'lobby') { renderLobby(); show('lobby'); return; }
   const me = S.me;
-  if (S.phase === 'playing' && me.role && !me.surrendered) { renderCard(); show('card'); return; }
+  if (S.phase === 'playing' && me.role && !me.surrendered) { if (currentScreen !== 'card') cardFlipped = false; renderCard(); show('card'); return; }
   renderBoard(); show('board');
 }
 
@@ -484,7 +501,8 @@ function renderCard(){
   const hasFile = role in NAME_Y;
   document.querySelector(".cardimg").classList.toggle("nofile", !hasFile);
   $("cFallback").innerHTML = hasFile ? "" : fallbackCard(r, S.players.find(p => p.id === myId)?.name || "");
-  $('card').className = 'on ' + r.team;
+  $('card').className = 'on ' + r.team + (cardFlipped ? ' flipped' : '');
+  $('cHint').textContent = cardFlipped ? 'اضغط مرة ثانية لتخبّيه' : '👆 اضغط على الكرت لتقلبه';
   if (hasFile) $('cImg').src = `img/cards/${role}.webp`;
   $('cImg').alt = r.name;
   $('cPlayer').style.setProperty('--ny', NAME_Y[role] || '39.6%');
@@ -503,8 +521,17 @@ function renderMates(){
         `<span class="mate${m.out ? " out" : ""}">${ROLES[m.role].icon} ${esc(m.name)} <small>${esc(ROLES[m.role].name)}</small></span>`).join("") + "</div>"
     : `<span class="hd" style="margin:0">🕶️ إنت المافيا الوحيد بهاي الجولة</span>`;
   // الكرت بيصغر على قد ما الشريط بياخد، عشان الزر يضل ظاهر بدون سكرول
-  requestAnimationFrame(() => $("card").style.setProperty("--reserve", (96 + $("cMates").offsetHeight + 12) + "px"));
+  if (!cardFlipped) return;
+  requestAnimationFrame(() => $("card").style.setProperty("--reserve", (130 + $("cMates").offsetHeight + 12) + "px"));
 }
+
+// الكرت بيبلش مقلوب كل ما تفتح شاشة الكرت من جديد
+let cardFlipped = false;
+$("cFlip").onclick = () => {
+  cardFlipped = !cardFlipped;
+  if (navigator.vibrate) navigator.vibrate(15);
+  renderCard();
+};
 
 const sBtn = $('surrenderBtn');
 function resetSurrender(){ sBtn.classList.remove('confirm'); $('sLabel').textContent = 'سلّم كرتك'; }
