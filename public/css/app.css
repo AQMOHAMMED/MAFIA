@@ -187,9 +187,16 @@ body.has-hb #card{padding-bottom:calc(98px + env(safe-area-inset-bottom))}
 /* القلب: الكرت بيبلش على ظهره، كبسة بتقلبه على وجهه وكبسة ثانية بترجعه */
 .flipper{position:absolute;inset:0;transform-style:preserve-3d;transition:transform .7s cubic-bezier(.3,1.25,.5,1)}
 .flipped .flipper{transform:rotateY(180deg)}
+.flipper{-webkit-transform-style:preserve-3d}
 .face{position:absolute;inset:0;backface-visibility:hidden;-webkit-backface-visibility:hidden}
+/* سفاري (آيفون) بيتجاهل إخفاء الوجه الخلفي إذا الصورة عليها فلتر/حركة، فبنخفيها هي كمان */
+.face img,.face>*{backface-visibility:hidden;-webkit-backface-visibility:hidden}
 .face img{filter:drop-shadow(0 10px 30px rgba(0,0,0,.7))}
 .face.front{transform:rotateY(180deg)}
+/* وكمان بنبدّل الوجهين بنص القلبة (لما الكرت يكون على جنبه) عشان ولا متصفح يورجي الوجه الغلط */
+.face.back,.face.front{transition:visibility 0s .1s}
+.face.front,.flipped .face.back{visibility:hidden}
+.flipped .face.front{visibility:visible}
 :not(.flipped)>.cardimg .face.back img,.cardimg:not(.flipped) .face.back img{animation:backGlow 2.2s ease-in-out infinite}
 @keyframes backGlow{0%,100%{filter:drop-shadow(0 10px 30px rgba(0,0,0,.7)) drop-shadow(0 0 6px rgba(240,190,80,.25))}
   50%{filter:drop-shadow(0 10px 30px rgba(0,0,0,.7)) drop-shadow(0 0 22px rgba(240,190,80,.55))}}
