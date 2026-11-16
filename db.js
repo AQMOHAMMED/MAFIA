@@ -19,10 +19,14 @@ const db = {
     try {
       if (this.kind === 'postgres') {
         const { Pool } = require('pg');
-        const url = process.env.DATABASE_URL;
+        const url = process.env.DATABASE_URL.trim();
+        const local = /@(localhost|127\.0\.0\.1)[:/]/.test(url);
+        // بنشيل sslmode من الرابط ونحدد التشفير هون، عشان مكتبة pg ما تطبع تحذيرات
+        const u = new URL(url);
+        u.searchParams.delete('sslmode');
         this._pool = new Pool({
-          connectionString: url,
-          ssl: /localhost|127\.0\.0\.1/.test(url) ? false : { rejectUnauthorized: false },
+          connectionString: u.toString(),
+          ssl: local ? false : { rejectUnauthorized: false },
           max: 3,
         });
         await this._pool.query('CREATE TABLE IF NOT EXISTS mafia_store (id INT PRIMARY KEY, data JSONB NOT NULL)');
